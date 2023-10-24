@@ -52,6 +52,7 @@ jobs:
           target: ${{ matrix.target }}
           pawpaw: true
 
+Comment: >
   pluginval:
     runs-on: ubuntu-20.04
     permissions:
