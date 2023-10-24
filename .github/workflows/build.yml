@@ -52,16 +52,15 @@ jobs:
           target: ${{ matrix.target }}
           pawpaw: true
 
-Comment: >
-  pluginval:
-    runs-on: ubuntu-20.04
-    permissions:
-        contents: write
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - uses: distrho/dpf-makefile-action@v1
-        with:
-          target: pluginval
-          pawpaw: true
+#  pluginval:
+#    runs-on: ubuntu-20.04
+#    permissions:
+#        contents: write
+#    steps:
+#      - uses: actions/checkout@v3
+#        with:
+#          submodules: recursive
+#      - uses: distrho/dpf-makefile-action@v1
+#        with:
+#          target: pluginval
+#          pawpaw: true
