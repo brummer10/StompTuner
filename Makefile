@@ -109,7 +109,6 @@ clean:
 	$(MAKE) clean -C dpf/dgl
 	$(MAKE) clean -C dpf/utils/lv2-ttl-generator
 	$(MAKE) clean -C plugins/StompTuner
-	rm -f FFTConvolver/AudioFFT.cpp.*
 	rm -rf bin build
 
 install: all

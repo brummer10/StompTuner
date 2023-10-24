@@ -27,8 +27,8 @@
 #include <zita-resampler/resampler.h>
 #include <fftw3.h>
 #include <semaphore.h>
-#include <semaphore.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <cstring>
 #include <cmath>
 #include <functional>
