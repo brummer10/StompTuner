@@ -28,15 +28,7 @@ tuner::tuner(std::function<void ()>setFreq_)
       pitch_tracker(setFreq_) {}
 
 void tuner::init(unsigned int samplingFreq) {
-    int priority = 0, policy = 0;
-#ifdef _POSIX_PRIORITY_SCHEDULING
-    int priomax = sched_get_priority_max(SCHED_FIFO);
-    if ((priomax/2.2) > 0) {
-        priority = priomax/2.2;
-        policy = SCHED_FIFO;
-    }
-#endif
-    pitch_tracker.init(policy, priority, samplingFreq);
+    pitch_tracker.init(samplingFreq);
 }
 
 int tuner::activate(bool start) {

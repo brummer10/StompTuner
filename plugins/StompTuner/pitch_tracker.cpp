@@ -37,6 +37,54 @@ static const float TRACKER_PERIOD = 0.1;
 // The size of the read buffer
 static const int FFT_SIZE = 2048;
 
+///////////////////////// INTERNAL WORKER CLASS   //////////////////////
+
+PitchTrackerWorker::PitchTrackerWorker()
+    : _execute(false),
+    is_done(false) {
+}
+
+PitchTrackerWorker::~PitchTrackerWorker() {
+    if( _execute.load(std::memory_order_acquire) ) {
+        stop();
+    };
+}
+
+void PitchTrackerWorker::stop() {
+    _execute.store(false, std::memory_order_release);
+    if (_thd.joinable()) {
+        cv.notify_one();
+        _thd.join();
+    }
+}
+
+void PitchTrackerWorker::start(PitchTracker *pt) {
+    if( _execute.load(std::memory_order_acquire) ) {
+        stop();
+    };
+    _execute.store(true, std::memory_order_release);
+    _thd = std::thread([this, pt]() {
+        while (_execute.load(std::memory_order_acquire)) {
+            std::unique_lock<std::mutex> lk(m);
+            // wait for signal from dsp that work is to do
+            cv.wait(lk);
+            //do work
+            if (_execute.load(std::memory_order_acquire)) {
+                pt->static_run(pt);
+            }
+        }
+        // when done
+    });
+}
+
+bool PitchTrackerWorker::is_running() const noexcept {
+    return ( _execute.load(std::memory_order_acquire) && 
+             _thd.joinable() );
+}
+
+
+/////////////////////////  PitchTracker Class   ////////////////////////
+
 
 void *PitchTracker::static_run(void *p) {
     (reinterpret_cast<PitchTracker *>(p))->run();
@@ -48,7 +96,6 @@ PitchTracker::PitchTracker(std::function<void ()>setFreq_)
       error(false),
       busy(false),
       tick(0),
-      m_pthr(0),
       resamp(),
       m_sampleRate(),
       fixed_sampleRate(41000),
@@ -75,12 +122,7 @@ PitchTracker::PitchTracker(std::function<void ()>setFreq_)
     memset(m_fftwBufferTime, 0, size * sizeof(*m_fftwBufferTime));
     memset(m_fftwBufferFreq, 0, size * sizeof(*m_fftwBufferFreq));
 
-    //sem_init(&m_trig, 0, 0);
-    sem_unlink("/stomptuner");
-    m_trig = sem_open("/stomptuner", O_CREAT|O_EXCL, S_IRWXU, 0);
-    if(m_trig == SEM_FAILED){
-        error = true;
-    }
+    worker.start(this);
     if (!m_buffer || !m_input || !m_fftwBufferTime || !m_fftwBufferFreq) {
         error = true;
     }
@@ -88,8 +130,7 @@ PitchTracker::PitchTracker(std::function<void ()>setFreq_)
 
 
 PitchTracker::~PitchTracker() {
-    stop_thread();
-    sem_unlink("/stomptuner");
+    worker.stop();
     fftwf_destroy_plan(m_fftwPlanFFT);
     fftwf_destroy_plan(m_fftwPlanIFFT);
     fftwf_free(m_fftwBufferTime);
@@ -115,7 +156,7 @@ void PitchTracker::set_fast_note_detection(bool v) {
     }
 }
 
-bool PitchTracker::setParameters(int priority, int policy, int sampleRate, int buffersize) {
+bool PitchTracker::setParameters(int sampleRate, int buffersize) {
     assert(buffersize <= FFT_SIZE);
 
     if (error) {
@@ -142,38 +183,11 @@ bool PitchTracker::setParameters(int priority, int policy, int sampleRate, int b
         return false;
     }
 
-    if (!m_pthr) {
-        start_thread(priority, policy);
-    }
     return !error;
 }
 
-void PitchTracker::stop_thread() {
-    pthread_cancel (m_pthr);
-    pthread_join (m_pthr, NULL);
-}
-
-void PitchTracker::start_thread(int priority, int policy) {
-    pthread_attr_t      attr;
-    struct sched_param  spar;
-    spar.sched_priority = priority;
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_JOINABLE );
-    pthread_setcancelstate (PTHREAD_CANCEL_ENABLE, NULL);
-    pthread_attr_setschedpolicy(&attr, policy);
-    pthread_attr_setschedparam(&attr, &spar);
-    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-    pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-    // pthread_attr_setstacksize(&attr, 0x10000);
-    if (pthread_create(&m_pthr, &attr, static_run,
-                       reinterpret_cast<void*>(this))) {
-        error = true;
-    }
-    pthread_attr_destroy(&attr);
-}
-
-void PitchTracker::init(int priority, int policy, unsigned int samplerate) {
-    setParameters(priority, policy, samplerate, FFT_SIZE);
+void PitchTracker::init(unsigned int samplerate) {
+    setParameters(samplerate, FFT_SIZE);
 }
 
 void PitchTracker::reset() {
@@ -210,7 +224,7 @@ void PitchTracker::add(int count, float* input) {
         busy = true;
         tick = 0;
         copy();
-        sem_post(m_trig);
+        worker.cv.notify_one();
     }
 }
 
@@ -314,54 +328,49 @@ static int findsubMaximum(float *input, int len, float threshold) {
 }
 
 void PitchTracker::run() {
-    for (;;) {
-        busy = false;
-        sem_wait(m_trig);
-        if (error) {
-            continue;
+    busy = false;
+    float sum = 0.0;
+    for (int k = 0; k < m_buffersize; ++k) {
+        sum += fabs(m_input[k]);
+    }
+    float threshold = (m_audioLevel ? signal_threshold_off : signal_threshold_on);
+    m_audioLevel = (sum / m_buffersize >= threshold);
+    if ( m_audioLevel == false ) {
+        if (m_freq != 0) {
+            m_freq = 0;
+            new_freq();
         }
-        float sum = 0.0;
-        for (int k = 0; k < m_buffersize; ++k) {
-            sum += fabs(m_input[k]);
-        }
-        float threshold = (m_audioLevel ? signal_threshold_off : signal_threshold_on);
-        m_audioLevel = (sum / m_buffersize >= threshold);
-        if ( m_audioLevel == false ) {
-	    if (m_freq != 0) {
-		m_freq = 0;
-		new_freq();
-	    }
-            continue;
-        }
+        return;
+    }
 
-        memcpy(m_fftwBufferTime, m_input, m_buffersize * sizeof(*m_fftwBufferTime));
-        memset(m_fftwBufferTime+m_buffersize, 0, (m_fftSize - m_buffersize) * sizeof(*m_fftwBufferTime));
-        fftwf_execute(m_fftwPlanFFT);
-        for (int k = 1; k < m_fftSize/2; k++) {
-            m_fftwBufferFreq[k] = sq(m_fftwBufferFreq[k]) + sq(m_fftwBufferFreq[m_fftSize-k]);
-            m_fftwBufferFreq[m_fftSize-k] = 0.0;
-        }
-        m_fftwBufferFreq[0] = sq(m_fftwBufferFreq[0]);
-        m_fftwBufferFreq[m_fftSize/2] = sq(m_fftwBufferFreq[m_fftSize/2]);
+    memcpy(m_fftwBufferTime, m_input, m_buffersize * sizeof(*m_fftwBufferTime));
+    memset(m_fftwBufferTime+m_buffersize, 0, (m_fftSize - m_buffersize) * sizeof(*m_fftwBufferTime));
+    fftwf_execute(m_fftwPlanFFT);
+    for (int k = 1; k < m_fftSize/2; k++) {
+        m_fftwBufferFreq[k] = sq(m_fftwBufferFreq[k]) + sq(m_fftwBufferFreq[m_fftSize-k]);
+        m_fftwBufferFreq[m_fftSize-k] = 0.0;
+    }
+    m_fftwBufferFreq[0] = sq(m_fftwBufferFreq[0]);
+    m_fftwBufferFreq[m_fftSize/2] = sq(m_fftwBufferFreq[m_fftSize/2]);
 
-        fftwf_execute(m_fftwPlanIFFT);
+    fftwf_execute(m_fftwPlanIFFT);
 
-        double sumSq = 2.0 * static_cast<double>(m_fftwBufferTime[0]) / static_cast<double>(m_fftSize);
-        for (int k = 0; k < m_fftSize - m_buffersize; k++) {
-            m_fftwBufferTime[k] = m_fftwBufferTime[k+1] / static_cast<float>(m_fftSize);
-        }
+    double sumSq = 2.0 * static_cast<double>(m_fftwBufferTime[0]) / static_cast<double>(m_fftSize);
+    for (int k = 0; k < m_fftSize - m_buffersize; k++) {
+        m_fftwBufferTime[k] = m_fftwBufferTime[k+1] / static_cast<float>(m_fftSize);
+    }
 
-        int count = (m_buffersize + 1) / 2;
-        for (int k = 0; k < count; k++) {
-            sumSq  -= sq(m_input[m_buffersize-1-k]) + sq(m_input[k]);
-            // dividing by zero is very slow, so deal with it seperately
-            if (sumSq > 0.0) {
-                m_fftwBufferTime[k] *= 2.0 / sumSq;
-            } else {
-                m_fftwBufferTime[k] = 0.0;
-            }
+    int count = (m_buffersize + 1) / 2;
+    for (int k = 0; k < count; k++) {
+        sumSq  -= sq(m_input[m_buffersize-1-k]) + sq(m_input[k]);
+        // dividing by zero is very slow, so deal with it seperately
+        if (sumSq > 0.0) {
+            m_fftwBufferTime[k] *= 2.0 / sumSq;
+        } else {
+            m_fftwBufferTime[k] = 0.0;
         }
-	const float thres = 0.99; // was 0.6
+    }
+    const float thres = 0.99; // was 0.6
         int maxAutocorrIndex = findsubMaximum(m_fftwBufferTime, count, thres);
 
         float x = 0.0;
@@ -375,10 +384,9 @@ void PitchTracker::run() {
                 x = 0.0;
             }
         }
-	if (m_freq != x) {
-	    m_freq = x;
-	    new_freq();
-	}
+    if (m_freq != x) {
+        m_freq = x;
+        new_freq();
     }
 }
 

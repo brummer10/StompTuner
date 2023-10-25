@@ -37,7 +37,8 @@ UI_TYPE = cairo
 include ../../dpf/Makefile.plugins.mk
 
 BUILD_CXX_FLAGS += -pthread -I../zita-resampler-1.1.0 -I../zita-resampler-1.1.0/zita-resampler \
-					-I../CairoWidgets -I../Utils `pkg-config --cflags --libs fftw3f `
+					-I../CairoWidgets -I../Utils $(shell $(PKG_CONFIG) --cflags fftw3f)
+LINK_FLAGS += -pthread $(shell $(PKG_CONFIG) --libs fftw3f)
 
 # --------------------------------------------------------------
 # Enable all selected plugin types

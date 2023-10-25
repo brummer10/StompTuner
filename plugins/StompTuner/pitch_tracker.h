@@ -26,12 +26,34 @@
 #include <assert.h>
 #include <zita-resampler/resampler.h>
 #include <fftw3.h>
-#include <semaphore.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <cstring>
 #include <cmath>
 #include <functional>
+
+#include <atomic>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
+class PitchTracker;
+
+///////////////////////// INTERNAL wORKER CLASS   //////////////////////
+
+class PitchTrackerWorker {
+private:
+    std::atomic<bool> _execute;
+    std::thread _thd;
+    std::mutex m;
+
+public:
+    PitchTrackerWorker();
+    ~PitchTrackerWorker();
+    void stop();
+    void start(PitchTracker *pt);
+    std::atomic<bool> is_done;
+    bool is_running() const noexcept;
+    std::condition_variable cv;
+};
 
 /* ------------- Pitch Tracker ------------- */
 
@@ -39,26 +61,23 @@ class PitchTracker {
  public:
     PitchTracker(std::function<void ()>setFreq_);
     ~PitchTracker();
-    void            init(int priority, int policy, unsigned int samplerate);
+    void            init(unsigned int samplerate);
     void            add(int count, float *input);
     float           get_estimated_freq() { return m_freq < 0 ? 0 : m_freq; }
     float           get_estimated_note();
-    void            stop_thread();
     void            reset();
     void            set_threshold(float v);
     void            set_fast_note_detection(bool v);
+    static void     *static_run(void* p);
  private:
     std::function<void ()> new_freq;
-    bool            setParameters(int priority, int policy, int sampleRate, int fftSize );
+    bool            setParameters(int sampleRate, int fftSize );
     void            run();
-    static void     *static_run(void* p);
-    void            start_thread(int policy, int priority);
     void            copy();
     bool            error;
     volatile bool   busy;
     int             tick;
-    sem_t           *m_trig;
-    pthread_t       m_pthr;
+    PitchTrackerWorker worker;
     Resampler       resamp;
     int             m_sampleRate;
     int             fixed_sampleRate;
