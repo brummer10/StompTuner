@@ -40,8 +40,7 @@ static const int FFT_SIZE = 2048;
 ///////////////////////// INTERNAL WORKER CLASS   //////////////////////
 
 PitchTrackerWorker::PitchTrackerWorker()
-    : _execute(false),
-    is_done(false) {
+    : _execute(false) {
 }
 
 PitchTrackerWorker::~PitchTrackerWorker() {
@@ -66,6 +65,7 @@ void PitchTrackerWorker::start(PitchTracker *pt) {
     _thd = std::thread([this, pt]() {
         while (_execute.load(std::memory_order_acquire)) {
             std::unique_lock<std::mutex> lk(m);
+            pt->busy.store(false, std::memory_order_release);
             // wait for signal from dsp that work is to do
             cv.wait(lk);
             //do work
@@ -94,7 +94,6 @@ void *PitchTracker::static_run(void *p) {
 PitchTracker::PitchTracker(std::function<void ()>setFreq_)
     : new_freq(setFreq_),
       error(false),
-      busy(false),
       tick(0),
       resamp(),
       m_sampleRate(),
@@ -111,6 +110,7 @@ PitchTracker::PitchTracker(std::function<void ()>setFreq_)
       m_audioLevel(false),
       m_fftwPlanFFT(0),
       m_fftwPlanIFFT(0) {
+    busy.store(false, std::memory_order_release);
     const int size = FFT_SIZE + (FFT_SIZE+1) / 2;
     m_fftwBufferTime = reinterpret_cast<float*>
                        (fftwf_malloc(size * sizeof(*m_fftwBufferTime)));
@@ -218,10 +218,10 @@ void PitchTracker::add(int count, float* input) {
         }
     }
     if (++tick * count >= m_sampleRate * DOWNSAMPLE * tracker_period) {
-        if (busy) {
+        if (busy.load(std::memory_order_acquire)) {
             return;
         }
-        busy = true;
+        busy.store(true, std::memory_order_release);
         tick = 0;
         copy();
         worker.cv.notify_one();
@@ -328,7 +328,6 @@ static int findsubMaximum(float *input, int len, float threshold) {
 }
 
 void PitchTracker::run() {
-    busy = false;
     float sum = 0.0;
     for (int k = 0; k < m_buffersize; ++k) {
         sum += fabs(m_input[k]);

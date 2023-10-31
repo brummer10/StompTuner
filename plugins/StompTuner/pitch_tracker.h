@@ -50,7 +50,6 @@ public:
     ~PitchTrackerWorker();
     void stop();
     void start(PitchTracker *pt);
-    std::atomic<bool> is_done;
     bool is_running() const noexcept;
     std::condition_variable cv;
 };
@@ -69,13 +68,13 @@ class PitchTracker {
     void            set_threshold(float v);
     void            set_fast_note_detection(bool v);
     static void     *static_run(void* p);
+    std::atomic<bool> busy;
  private:
     std::function<void ()> new_freq;
     bool            setParameters(int sampleRate, int fftSize );
     void            run();
     void            copy();
     bool            error;
-    volatile bool   busy;
     int             tick;
     PitchTrackerWorker worker;
     Resampler       resamp;
