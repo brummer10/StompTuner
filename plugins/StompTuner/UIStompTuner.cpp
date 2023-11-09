@@ -111,6 +111,7 @@ void UIStompTuner::uiReshape(uint width, uint height) {
 */
 void UIStompTuner::onCairoDisplay(const CairoGraphicsContext& context) {
     cairo_t* const cr = context.handle;
+    if (cairo_status(cr) != CAIRO_STATUS_SUCCESS) return;
     int width = getWidth();
     int height = getHeight();
     const float scaleH = sizeGroup->getScaleHFactor();
