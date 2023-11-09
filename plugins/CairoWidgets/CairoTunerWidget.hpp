@@ -38,13 +38,13 @@ public:
     void setFrequency(float v)
     {
         detectedFrequency = v;
-        repaint();
+        //repaint(); // use uiIdle() to repaint in intervals
     }
 
     void setRefFreq(float v)
     {
         refFreq = v;
-        repaint();
+        //repaint(); // use uiIdle() to repaint in intervals
     }
 
 protected:
@@ -122,6 +122,7 @@ protected:
     {
         getNote();
         cairo_t* const cr = context.handle;
+        if (cairo_status(cr) != CAIRO_STATUS_SUCCESS) return;
 
         const Size<uint> sz = getSize();
         const int width = sz.getWidth();

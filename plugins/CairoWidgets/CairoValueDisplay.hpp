@@ -52,7 +52,7 @@ public:
     void setValue(float v)
     {
         value = v;
-        repaint();
+        //repaint(); // use uiIdle() to repaint in intervals
     }
     
     void setAdjustment(float value_, float min_value_, float max_value_, float value_step_)
@@ -62,7 +62,7 @@ public:
         max_value = max_value_;
         value_step = value_step_;
         stepper = getStepper();
-        repaint();
+        //repaint(); // use uiIdle() to repaint in intervals
     }
 
     std::function<void(const uint32_t, float) > setUiValue;
@@ -100,6 +100,7 @@ protected:
     void onCairoDisplay(const CairoGraphicsContext& context) override
     {
         cairo_t* const cr = context.handle;
+        if (cairo_status(cr) != CAIRO_STATUS_SUCCESS) return;
 
         /** get size for the value display **/
         const Size<uint> sz = getSize();
@@ -213,14 +214,14 @@ protected:
             if (!prelight && !(*blocked)) {
                 prelight = true;
                 (*blocked) = true;
-                repaint();
+                //repaint(); // use uiIdle() to repaint in intervals
             }
         }
         else if (prelight && !inDrag) // leave
         {
             prelight = false;
             (*blocked) = false;
-            repaint();
+            //repaint(); // use uiIdle() to repaint in intervals
         }
 
         return CairoSubWidget::onMotion(event);

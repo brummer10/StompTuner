@@ -58,7 +58,7 @@ public:
     void setValue(float v)
     {
         value = v;
-        repaint();
+        //repaint(); // use uiIdle() to repaint in intervals
     }
 
 protected:
@@ -83,7 +83,7 @@ protected:
         if (setState.load(std::memory_order_acquire)) {
             setState.store(false, std::memory_order_release);
             state = 0;
-            repaint();
+            //repaint(); // use uiIdle() to repaint in intervals
             return false;
         } else {
             setState.store(true, std::memory_order_release);
@@ -94,6 +94,7 @@ protected:
     void onCairoDisplay(const CairoGraphicsContext& context) override
     {
         cairo_t* const cr = context.handle;
+        if (cairo_status(cr) != CAIRO_STATUS_SUCCESS) return;
         const Size<uint> sz = getSize();
         const int w = sz.getWidth();
         const int h = sz.getHeight();
@@ -149,12 +150,12 @@ protected:
             state = 1;
             led->setValue(value);
             setParameterValue(port, value);
-            repaint();
+            //repaint(); // use uiIdle() to repaint in intervals
         }
         else if (state)
         {
             state = 0;
-            repaint();
+            //repaint(); // use uiIdle() to repaint in intervals
         }
 
         return CairoSubWidget::onMouse(event);
@@ -184,14 +185,14 @@ protected:
             if (!prelight && !(*blocked)) {
                 prelight = true;
                 (*blocked) = true;
-                repaint();
+                //repaint(); // use uiIdle() to repaint in intervals
             }
         }
         else if (prelight) // leave
         {
             prelight = false;
             (*blocked) = false;
-            repaint();
+            //repaint(); // use uiIdle() to repaint in intervals
         }
 
         return CairoSubWidget::onMotion(event);

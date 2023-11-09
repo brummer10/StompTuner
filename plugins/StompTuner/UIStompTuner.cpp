@@ -92,7 +92,7 @@ void UIStompTuner::sampleRateChanged(double newSampleRate) {
   This function is called at regular intervals.
 */
 void UIStompTuner::uiIdle() {
-    tunerDisplay->repaint();
+    repaint();
 }
 
 /**
