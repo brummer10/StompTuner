@@ -74,7 +74,7 @@ protected:
     }
 
     uint32_t getVersion() const noexcept override {
-        return d_version(0, 1, 4);
+        return d_version(0, 1, 6);
     }
 
     // Go to:

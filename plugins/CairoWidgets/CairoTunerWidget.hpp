@@ -65,24 +65,27 @@ protected:
     {
         if (detectedFrequency > 23.0f && detectedFrequency < 999.0f)
         {
-            float scale = -0.5;
 
             float fdetectedNote = 12.0 * (log2f(detectedFrequency/refFreq) + 4);
             float fdetectedNoter = round(fdetectedNote);
-            detectedNote = fdetectedNoter;
-            detectedOctave = round((fdetectedNoter + 3)/12);
+            int idetectedNote = fdetectedNoter;
+            int idetectedOctave = round((fdetectedNoter + 3)/12);
             const int octsz = sizeof(octave) / sizeof(octave[0]);
-            if (detectedOctave < 0 || detectedOctave >= octsz) {
+            if (idetectedOctave < 0 || idetectedOctave >= octsz) {
                 // just safety, should not happen with current parameters
                 // (pitch tracker output 23 .. 999 Hz)
-                detectedOctave = octsz - 1;
+                idetectedOctave = octsz - 1;
             }
 
-            scale = (fdetectedNote-detectedNote) / 4;
-            cent = (scale * 10000) / 25;
-            detectedNote = detectedNote % 12;
-            if (detectedNote < 0) {
-                detectedNote += 12;
+            cent = (fdetectedNote-idetectedNote) * 100.0f;
+            idetectedNote = idetectedNote % 12;
+            if (idetectedNote < 0) {
+                idetectedNote += 12;
+            }
+            // avoid octave jumps
+            if (idetectedNote != detectedNote - 12) {
+                detectedNote = idetectedNote;
+                detectedOctave = idetectedOctave;
             }
         }
         else

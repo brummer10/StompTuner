@@ -83,7 +83,11 @@ all: libs plugins gen
 submodules:
 	git submodule update --init --recursive
 
-libs:
+pugl_patch.flag:
+	cd dpf/dgl/src/pugl-upstream/ && git apply ../../../../pugl.patch
+	touch pugl_patch.flag
+
+libs: pugl_patch.flag
 	$(MAKE) -C dpf/dgl ../build/libdgl-cairo.a
 
 plugins: libs
@@ -110,7 +114,8 @@ clean:
 	$(MAKE) clean -C dpf/utils/lv2-ttl-generator
 	$(MAKE) clean -C plugins/StompTuner
 	rm -rf bin build
-
+	cd dpf/dgl/src/pugl-upstream/ && git apply -R ../../../../pugl.patch
+	rm -f pugl_patch.flag
 install: all
 	$(MAKE) install -C plugins/StompTuner
 
