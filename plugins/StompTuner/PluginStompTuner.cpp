@@ -95,7 +95,9 @@ void PluginStompTuner::setFreq() {
 void PluginStompTuner::sampleRateChanged(double newSampleRate) {
     fSampleRate = newSampleRate;
     srChanged = true;
-    //activate();
+    lhcut->init_static(fSampleRate, lhcut);
+    dsp->activate(false);
+    dsp->init(fSampleRate);
     srChanged = false;
 }
 

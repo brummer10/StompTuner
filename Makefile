@@ -114,8 +114,10 @@ clean:
 	$(MAKE) clean -C dpf/utils/lv2-ttl-generator
 	$(MAKE) clean -C plugins/StompTuner
 	rm -rf bin build
+ifneq (,$(wildcard ./pugl_patch.flag))
 	cd dpf/dgl/src/pugl-upstream/ && git apply -R ../../../../pugl.patch
 	rm -f pugl_patch.flag
+endif
 install: all
 	$(MAKE) install -C plugins/StompTuner
 
