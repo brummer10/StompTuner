@@ -15,6 +15,7 @@ StompTuner come in the following plug-in formats:
 * [VST2]
 * [VST3]
 * [CLAP]
+* [AU]
 
 ## Compiling
 
@@ -52,6 +53,7 @@ dedicated makefile variable.
 * VST2: `VST3_DIR` (`<prefix>/lib/vst2`)
 * VST3: `VST3_DIR` (`<prefix>/lib/vst3`)
 * CLAP: `CLAP_DIR` (`<prefix>/lib/clap`)
+* AU:   `AU_DIR` (`/Library/Audio/Plug-Ins/Components`)
 
 Example:
 
@@ -72,6 +74,7 @@ a dedicated makefile variable.
 * VST2: `USER_VST2_DIR` (`$HOME/.vst2`)
 * VST3: `USER_VST3_DIR` (`$HOME/.vst3`)
 * CLAP: `USER_CLAP_DIR` (`$HOME/.clap`)
+* AU:   `AU_DIR` (`$HOME/Library/Audio/Plug-Ins/Components`)
 
 *Note: The given default values for all of the above listed environment
 variables differ depending on the target OS.*
@@ -107,3 +110,4 @@ This project is built using the DISTRHO Plugin Framework ([DPF])
 [VST2]: https://en.wikipedia.org/wiki/Virtual_Studio_Technology
 [VST3]: https://en.wikipedia.org/wiki/Virtual_Studio_Technology
 [CLAP]:https://en.wikipedia.org/wiki/CLever_Audio_Plug-in
+[AU]:https://en.wikipedia.org/wiki/Audio_Unit

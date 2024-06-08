@@ -8,6 +8,7 @@
 
 #include "UIStompTuner.hpp"
 #include "Window.hpp"
+#include "leder.c"
 
 START_NAMESPACE_DISTRHO
 
@@ -22,9 +23,10 @@ UIStompTuner::UIStompTuner()
     sizeGroup = new UiSizeGroup(kInitialWidth, kInitialHeight);
     
     theme.setIdColour(theme.idColourBackgroundActive, 0.0, 0.898, 0.647, 1.0);
-    theme.setIdColour(theme.idColourBackground, 0.07, 0.106, 0.188, 1.0);
+    theme.setIdColour(theme.idColourBackground, 0.17, 0.306, 0.388, 1.0);
     theme.setIdColour(theme.idColourForground, 0.0, 0.898, 0.647, 0.6);
     theme.setIdColour(theme.idColourForgroundNormal, 0.424, 0.455, 0.494, 1.0);
+    texture = theme.cairo_image_surface_create_from_stream (leder_png);
 
     tunerDisplay = new CairoTunerWidget(this, theme);
     sizeGroup->addToSizeGroup(tunerDisplay, 32, 50, 220, 140);
@@ -47,7 +49,7 @@ UIStompTuner::UIStompTuner()
 }
 
 UIStompTuner::~UIStompTuner() {
-
+    cairo_surface_destroy(texture);
 }
 
 // -----------------------------------------------------------------------
@@ -121,6 +123,13 @@ void UIStompTuner::onCairoDisplay(const CairoGraphicsContext& context) {
 
     theme.setCairoColour(cr, theme.idColourBackground);
     cairo_paint(cr);
+
+    cairo_pattern_t *pat = cairo_pattern_create_for_surface(texture);
+    cairo_pattern_set_extend (pat, CAIRO_EXTEND_REPEAT);
+    cairo_set_source(cr, pat);
+    cairo_paint (cr);
+    cairo_pattern_destroy (pat);
+
     theme.boxShadow(cr, width, height, 25, 25);
 
     cairo_rectangle(cr, 25 * scaleW, 25 * scaleH, width - (50 * scaleW), height - (50 * scaleH));
